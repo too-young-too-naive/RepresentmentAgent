@@ -8,7 +8,7 @@
 #SBATCH --error=logs/vllm-%j.err
 
 # ── Configuration ──────────────────────────────────────────────
-MODEL_NAME="${MODEL_NAME:-meta-llama/Llama-3.1-70B-Instruct}"
+MODEL_NAME="${MODEL_NAME:-Qwen/Qwen3.5-27B}"
 PORT="${PORT:-8000}"
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-4096}"
 # Set your HuggingFace token for gated models (Llama, etc.)
