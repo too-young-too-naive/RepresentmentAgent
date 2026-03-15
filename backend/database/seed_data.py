@@ -112,8 +112,86 @@ def run_seed(db: Session):
     ]
     db.add_all(payments)
 
-    # --- Pre-seeded chargeback from Chase ---
-    chargeback = Chargeback(
+    # --- Customer: Michael Chen (lost shipment victim) ---
+    michael = Customer(
+        name="Michael Chen",
+        email="m.chen@email.com",
+        phone="(555) 444-7890",
+        address="88 Pine Avenue, San Jose, CA 95112",
+        account_created_at=datetime(2025, 9, 1),
+    )
+
+    # --- Customer: Sarah Williams (double-charged) ---
+    sarah = Customer(
+        name="Sarah Williams",
+        email="sarah.w@email.com",
+        phone="(555) 321-0987",
+        address="450 Elm Boulevard, Austin, TX 78701",
+        account_created_at=datetime(2025, 1, 15),
+    )
+
+    db.add_all([michael, sarah])
+    db.flush()
+
+    # --- Order for Michael Chen (lost in transit — no delivery confirmation) ---
+    order5 = Order(
+        customer_id=michael.customer_id,
+        amount=799.99,
+        item_description="Apple AirPods Max - Space Gray",
+        order_date=datetime(2026, 1, 25),
+        shipping_status="lost",
+        tracking_number="1Z999AA10123456805",
+        delivery_date=None,
+    )
+
+    # --- Orders for Sarah Williams (duplicate charge) ---
+    order6 = Order(
+        customer_id=sarah.customer_id,
+        amount=429.99,
+        item_description="Bose QuietComfort Ultra Earbuds",
+        order_date=datetime(2026, 2, 5),
+        shipping_status="delivered",
+        tracking_number="1Z999AA10123456810",
+        delivery_date=datetime(2026, 2, 8),
+    )
+
+    db.add_all([order5, order6])
+    db.flush()
+
+    payments += [
+        Payment(
+            order_id=order5.order_id,
+            customer_id=michael.customer_id,
+            card_last_four="7291",
+            amount=799.99,
+            status="completed",
+            payment_date=datetime(2026, 1, 25),
+            bank_name="Chase",
+        ),
+        Payment(
+            order_id=order6.order_id,
+            customer_id=sarah.customer_id,
+            card_last_four="3156",
+            amount=429.99,
+            status="completed",
+            payment_date=datetime(2026, 2, 5),
+            bank_name="Bank of America",
+        ),
+        # Duplicate/erroneous charge for Sarah (same order, same amount, same day)
+        Payment(
+            order_id=order6.order_id,
+            customer_id=sarah.customer_id,
+            card_last_four="3156",
+            amount=429.99,
+            status="completed",
+            payment_date=datetime(2026, 2, 5),
+            bank_name="Bank of America",
+        ),
+    ]
+    db.add_all(payments)
+
+    # --- Pre-seeded chargeback #1: John Smith (DEFEND — strong evidence) ---
+    chargeback1 = Chargeback(
         case_id="CB-2026-0314",
         bank_name="Chase",
         cardholder_name="John Smith",
@@ -128,5 +206,42 @@ def run_seed(db: Session):
         status="new",
         created_at=datetime(2026, 3, 14),
     )
-    db.add(chargeback)
+
+    # --- Pre-seeded chargeback #2: Michael Chen (ACCEPT — package lost, no delivery proof) ---
+    chargeback2 = Chargeback(
+        case_id="CB-2026-0220",
+        bank_name="Chase",
+        cardholder_name="Michael Chen",
+        card_last_four="7291",
+        transaction_amount=799.99,
+        transaction_date=datetime(2026, 1, 25),
+        reason_code="13.3 - Not as Described or Defective (Goods Not Received)",
+        cardholder_statement=(
+            "I ordered AirPods Max from Acme Electronics on January 25 but never "
+            "received the package. Tracking shows it was lost in transit. I contacted "
+            "the merchant but they refused to refund or reship."
+        ),
+        status="new",
+        created_at=datetime(2026, 2, 20),
+    )
+
+    # --- Pre-seeded chargeback #3: Sarah Williams (ACCEPT — duplicate charge) ---
+    chargeback3 = Chargeback(
+        case_id="CB-2026-0301",
+        bank_name="Bank of America",
+        cardholder_name="Sarah Williams",
+        card_last_four="3156",
+        transaction_amount=429.99,
+        transaction_date=datetime(2026, 2, 5),
+        reason_code="12.1 - Processing Error (Late Presentment / Duplicate)",
+        cardholder_statement=(
+            "I was charged twice for the same purchase of Bose QuietComfort Ultra "
+            "Earbuds on February 5th. I only made one order but my statement shows "
+            "two charges of $429.99 from Acme Electronics."
+        ),
+        status="new",
+        created_at=datetime(2026, 3, 1),
+    )
+
+    db.add_all([chargeback1, chargeback2, chargeback3])
     db.commit()

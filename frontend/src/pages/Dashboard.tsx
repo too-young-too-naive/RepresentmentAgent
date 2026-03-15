@@ -6,7 +6,7 @@ import ChargebackCard from "../components/ChargebackCard";
 export default function Dashboard() {
   const [cases, setCases] = useState<ChargebackCase[]>([]);
   const [loading, setLoading] = useState(true);
-  const [simulating, setSimulating] = useState(false);
+  const [simulating, setSimulating] = useState<string | null>(null);
 
   const fetchCases = async () => {
     try {
@@ -21,13 +21,13 @@ export default function Dashboard() {
     fetchCases();
   }, []);
 
-  const handleSimulate = async () => {
-    setSimulating(true);
+  const handleSimulate = async (scenario: "defend" | "accept") => {
+    setSimulating(scenario);
     try {
-      await simulateIncomingChargeback();
+      await simulateIncomingChargeback(scenario);
       await fetchCases();
     } finally {
-      setSimulating(false);
+      setSimulating(null);
     }
   };
 
@@ -42,13 +42,22 @@ export default function Dashboard() {
             {cases.length} case{cases.length !== 1 ? "s" : ""} total
           </p>
         </div>
-        <button
-          onClick={handleSimulate}
-          disabled={simulating}
-          className="px-4 py-2 bg-navy-600 text-white rounded-lg text-sm font-medium hover:bg-navy-700 disabled:opacity-50 transition-colors"
-        >
-          {simulating ? "Receiving..." : "Simulate Chase Chargeback"}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleSimulate("defend")}
+            disabled={simulating !== null}
+            className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+          >
+            {simulating === "defend" ? "Receiving..." : "Simulate Chargeback — Defend"}
+          </button>
+          <button
+            onClick={() => handleSimulate("accept")}
+            disabled={simulating !== null}
+            className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 disabled:opacity-50 transition-colors"
+          >
+            {simulating === "accept" ? "Receiving..." : "Simulate Chargeback — Accept"}
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -59,7 +68,7 @@ export default function Dashboard() {
         <div className="text-center py-20 text-slate-400">
           <p className="text-lg">No chargeback cases yet</p>
           <p className="text-sm mt-1">
-            Click "Simulate Chase Chargeback" to create one
+            Use the buttons above to simulate incoming chargebacks
           </p>
         </div>
       ) : (

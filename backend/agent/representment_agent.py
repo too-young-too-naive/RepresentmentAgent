@@ -5,6 +5,8 @@ Uses the LangChain 1.2+ create_agent API (backed by LangGraph).
 from __future__ import annotations
 
 import json
+import sys
+import time
 from datetime import datetime
 from typing import AsyncGenerator, Dict
 
@@ -283,9 +285,13 @@ async def resolve_chargeback(case_id: str) -> AsyncGenerator[str, None]:
     )
 
     agent = _build_agent()
+    t0 = time.perf_counter()
+
+    print(f"[AGENT] {case_id}: Started, calling LLM at {LLM_BASE_URL} (model: {LLM_MODEL_NAME})", flush=True)
 
     try:
         step_count = 0
+        tool_start_time = None
         async for event in agent.astream_events(
             {"messages": [{"role": "user", "content": user_input}]},
             version="v2",
@@ -294,8 +300,11 @@ async def resolve_chargeback(case_id: str) -> AsyncGenerator[str, None]:
 
             if kind == "on_tool_start":
                 step_count += 1
+                tool_start_time = time.perf_counter()
                 tool_name = event.get("name", "unknown")
                 tool_input = event.get("data", {}).get("input", {})
+                elapsed = time.perf_counter() - t0
+                print(f"[AGENT] {case_id}: Tool {step_count} {tool_name} (elapsed {elapsed:.1f}s)", flush=True)
                 yield _sse("tool_start", {
                     "step": step_count,
                     "tool": tool_name,
@@ -307,6 +316,8 @@ async def resolve_chargeback(case_id: str) -> AsyncGenerator[str, None]:
                 output = event.get("data", {}).get("output", "")
                 if hasattr(output, "content"):
                     output = output.content
+                tool_elapsed = time.perf_counter() - tool_start_time if tool_start_time else 0
+                print(f"[AGENT] {case_id}: Tool {tool_name} done ({tool_elapsed:.1f}s), waiting for LLM...", flush=True)
                 yield _sse("tool_end", {
                     "step": step_count,
                     "tool": tool_name,
@@ -320,12 +331,15 @@ async def resolve_chargeback(case_id: str) -> AsyncGenerator[str, None]:
                         "token": chunk.content,
                     })
 
+        total_elapsed = time.perf_counter() - t0
+        print(f"[AGENT] {case_id}: Completed in {total_elapsed:.1f}s", flush=True)
         yield _sse("agent_end", {
             "case_id": case_id,
             "message": "Agent completed processing",
         })
 
     except Exception as e:
+        print(f"[AGENT] {case_id}: ERROR - {e}", flush=True)
         yield _sse("error", {"message": str(e)})
 
         db = _get_db()

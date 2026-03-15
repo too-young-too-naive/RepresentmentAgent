@@ -13,9 +13,9 @@ router = APIRouter(tags=["bank"])
 
 
 @router.post("/webhook", response_model=ChargebackOut)
-def bank_webhook(db: Session = Depends(get_db)):
-    """Simulate receiving a new chargeback notification from Chase."""
-    cb_req = receive_chargeback()
+def bank_webhook(scenario: str = "defend", db: Session = Depends(get_db)):
+    """Simulate receiving a new chargeback notification from a bank."""
+    cb_req = receive_chargeback(scenario=scenario)
     chargeback = Chargeback(
         case_id=cb_req.case_id,
         bank_name=cb_req.bank_name,

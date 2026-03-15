@@ -38,6 +38,8 @@ export function getChargeback(caseId: string): Promise<ChargebackCase> {
   return request(`/chargebacks/${caseId}`);
 }
 
-export function simulateIncomingChargeback(): Promise<ChargebackCase> {
-  return request("/bank/webhook", { method: "POST" });
+export function simulateIncomingChargeback(
+  scenario: "defend" | "accept" = "defend"
+): Promise<ChargebackCase> {
+  return request(`/bank/webhook?scenario=${scenario}`, { method: "POST" });
 }

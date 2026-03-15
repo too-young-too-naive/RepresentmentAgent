@@ -40,10 +40,10 @@ echo ">>>   LLM_MODEL_NAME=${MODEL_NAME}"
 echo ">>>   LLM_API_KEY=dummy-key"
 echo ""
 
-pip install vllm --quiet 2>&1 | tail -3
+pip3 install vllm --quiet 2>&1 | tail -3
 
 echo "Starting vLLM server..."
-python -m vllm.entrypoints.openai.api_server \
+python3 -m vllm.entrypoints.openai.api_server \
     --model "$MODEL_NAME" \
     --port "$PORT" \
     --max-model-len "$MAX_MODEL_LEN" \
